@@ -1,0 +1,5 @@
+config settings 'settings'
+	option mode 'wan_first'
+	# Extra proxy services reloaded when the IPv4 exit changes (daed is
+	# handled automatically). Space separated list, e.g. 'passwall mosdns'.
+	# list proxy_services 'passwall'

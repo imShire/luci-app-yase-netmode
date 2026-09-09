@@ -1,0 +1,14 @@
+{
+	"admin/network/yase_netmode": {
+		"title": "Network Mode",
+		"order": 55,
+		"action": {
+			"type": "view",
+			"path": "yase_netmode/netmode"
+		},
+		"depends": {
+			"acl": [ "luci-app-yase-netmode" ],
+			"uci": { "yase_netmode": true }
+		}
+	}
+}

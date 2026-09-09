@@ -10,7 +10,7 @@ return view.extend({
 	handleReset: null,
 
 	statusCommand: function() {
-		return fs.exec('/usr/sbin/h5000m-netmode-status').catch(function() {
+		return fs.exec('/usr/sbin/yase-netmode-status').catch(function() {
 			return { stdout: '' };
 		});
 	},
@@ -172,7 +172,7 @@ return view.extend({
 		this.applying = true;
 		this.repaint();
 
-		return fs.exec('/usr/sbin/h5000m-netmode', [ 'set', this.pendingMode ]).then(L.bind(function() {
+		return fs.exec('/usr/sbin/yase-netmode', [ 'set', this.pendingMode ]).then(L.bind(function() {
 			ui.addNotification(null, E('p', _('Exit selection applied successfully.')));
 			this.selecting = false;
 			return new Promise(L.bind(function(resolve) {

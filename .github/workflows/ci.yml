@@ -13,17 +13,23 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Install validation tools
-        run: sudo apt-get update && sudo apt-get install -y gettext
+        run: sudo apt-get update && sudo apt-get install -y gettext jq
       - name: Check shell syntax
         run: |
-          sh -n root/etc/hotplug.d/iface/95-h5000m-netmode
-          sh -n root/etc/uci-defaults/90-h5000m-netmode
-          sh -n root/usr/sbin/h5000m-netmode
+          sh -n root/etc/hotplug.d/iface/95-yase-netmode
+          sh -n root/etc/uci-defaults/90-yase-netmode
+          sh -n root/usr/sbin/yase-netmode
+          sh -n root/usr/sbin/yase-netmode-status
       - name: Check LuCI JavaScript syntax
-        run: node --check htdocs/luci-static/resources/view/h5000m/netmode.js
+        run: node --check htdocs/luci-static/resources/view/yase_netmode/netmode.js
       - name: Validate JSON metadata
         run: |
-          jq empty root/usr/share/luci/menu.d/luci-app-h5000m-netmode.json
-          jq empty root/usr/share/rpcd/acl.d/luci-app-h5000m-netmode.json
+          jq empty root/usr/share/luci/menu.d/luci-app-yase-netmode.json
+          jq empty root/usr/share/rpcd/acl.d/luci-app-yase-netmode.json
       - name: Validate translations
-        run: msgfmt --check --check-format -o /dev/null po/zh_Hans/h5000m-netmode.po
+        run: msgfmt --check --check-format -o /dev/null po/zh_Hans/yase-netmode.po
+      - name: Check package metadata
+        run: |
+          grep -Fx 'PKG_NAME:=luci-app-yase-netmode' Makefile
+          grep -Fx 'LUCI_PKGARCH:=all' Makefile
+          grep -Fx '/etc/config/yase_netmode' Makefile

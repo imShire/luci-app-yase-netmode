@@ -1,17 +1,17 @@
 include $(TOPDIR)/rules.mk
 
-PKG_NAME:=luci-app-h5000m-netmode
-PKG_VERSION:=1.3.1
-PKG_RELEASE:=2
+PKG_NAME:=luci-app-yase-netmode
+PKG_VERSION:=1.0.0
+PKG_RELEASE:=1
 PKG_LICENSE:=Apache-2.0
 PKG_LICENSE_FILES:=LICENSE
 
-LUCI_TITLE:=H5000M network priority switch
+LUCI_TITLE:=YASE network mode switcher (wired WAN / 5G)
 LUCI_DEPENDS:=+luci-base
 LUCI_PKGARCH:=all
 
-define Package/luci-app-h5000m-netmode/conffiles
-/etc/config/h5000m_netmode
+define Package/luci-app-yase-netmode/conffiles
+/etc/config/yase_netmode
 endef
 
 include $(TOPDIR)/feeds/luci/luci.mk

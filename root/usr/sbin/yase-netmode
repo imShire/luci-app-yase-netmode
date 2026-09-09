@@ -1,10 +1,15 @@
 #!/bin/sh
 
-TAG="h5000m-netmode"
-LOCK_DIR="/var/lock/h5000m-netmode.lock"
-DAED_EXIT_STATE_FILE="/var/run/h5000m-netmode.daed-exit"
+# yase-netmode - wired WAN / 5G cellular exit policy switcher
+# Forked from luci-app-h5000m-netmode (FAN789, Apache-2.0).
+# The 5G uplink is the netifd logical interface "usbwan" (device usb0);
+# its IPv6 companion is "usbwan6" or any interface stacked on @usbwan.
 
-mode="$(uci -q get h5000m_netmode.settings.mode || echo wan_first)"
+TAG="yase-netmode"
+LOCK_DIR="/var/lock/yase-netmode.lock"
+EXIT_STATE_FILE="/var/run/yase-netmode.exit"
+
+mode="$(uci -q get yase_netmode.settings.mode || echo wan_first)"
 
 normalize_mode() {
 	case "$mode" in
@@ -34,34 +39,28 @@ append_modem_section() {
 }
 
 discover_modem_interfaces() {
-	local modem section device
+	local section device
 
 	MODEM_SECTIONS=""
 	MODEM_PRIMARY=""
 	MODEM6_PRIMARY=""
-	MODEM_NETDEV=""
 
-	MODEM_NETDEV="$(uci -q get network.MT5700M.device 2>/dev/null || uci -q get network.MT5700M.ifname 2>/dev/null || true)"
+	# The 5G uplink is the fixed netifd logical interface "usbwan".
+	if interface_exists usbwan; then
+		MODEM_PRIMARY="usbwan"
+		append_modem_section usbwan
+	fi
 
-	# First find the IPv4 interface attached directly to the MT5700M data device.
+	# IPv6 companion: prefer a dedicated usbwan6 section, otherwise accept any
+	# interface stacked on @usbwan (netifd alias style).
 	for section in $(uci -q show network 2>/dev/null | sed -n 's/^network\.\([^.]*\)=interface$/\1/p'); do
+		[ "$section" = "usbwan" ] && continue
 		device="$(uci -q get "network.${section}.device" || uci -q get "network.${section}.ifname" || true)"
-		if { [ -n "$MODEM_NETDEV" ] && [ "$device" = "$MODEM_NETDEV" ]; } || \
-		   { [ -z "$MODEM_NETDEV" ] && { [ "$section" = "MT5700M" ] || [ "$section" = "USB" ]; }; }; then
-			append_modem_section "$section"
-			[ -n "$MODEM_PRIMARY" ] || MODEM_PRIMARY="$section"
-		fi
-	done
-
-	# Then include IPv6 aliases such as MT5700Mv6 -> @MT5700M.
-	if [ -n "$MODEM_PRIMARY" ]; then
-		for section in $(uci -q show network 2>/dev/null | sed -n 's/^network\.\([^.]*\)=interface$/\1/p'); do
-			device="$(uci -q get "network.${section}.device" || uci -q get "network.${section}.ifname" || true)"
-			[ "$device" = "@${MODEM_PRIMARY}" ] || continue
+		if [ "$section" = "usbwan6" ] || [ "$device" = "@usbwan" ]; then
 			append_modem_section "$section"
 			[ -n "$MODEM6_PRIMARY" ] || MODEM6_PRIMARY="$section"
-		done
-	fi
+		fi
+	done
 }
 
 read_interface() {
@@ -127,17 +126,17 @@ route_owner() {
 	fi
 }
 
-store_daed_exit_state() {
+store_exit_state() {
 	local owner="$1" temporary
 
-	temporary="${DAED_EXIT_STATE_FILE}.new.$$"
+	temporary="${EXIT_STATE_FILE}.new.$$"
 	umask 077
 	printf '%s\n' "$owner" > "$temporary" || return 1
-	mv -f "$temporary" "$DAED_EXIT_STATE_FILE"
+	mv -f "$temporary" "$EXIT_STATE_FILE"
 }
 
-reload_daed_on_exit_change() {
-	local current previous pid
+reload_proxies_on_exit_change() {
+	local current previous pid svc
 
 	read_live_state
 	current="$ACTIVE4"
@@ -146,12 +145,12 @@ reload_daed_on_exit_change() {
 		*) return 0 ;;
 	esac
 
-	previous="$(cat "$DAED_EXIT_STATE_FILE" 2>/dev/null || true)"
+	previous="$(cat "$EXIT_STATE_FILE" 2>/dev/null || true)"
 	case "$previous" in
 		wan|modem) ;;
 		*)
-			store_daed_exit_state "$current"
-			logger -t "$TAG" "recorded initial daed IPv4 exit=$current"
+			store_exit_state "$current"
+			logger -t "$TAG" "recorded initial IPv4 exit=$current"
 			return 0
 			;;
 	esac
@@ -159,25 +158,36 @@ reload_daed_on_exit_change() {
 
 	# daed exposes hot reload only through its authenticated GraphQL API. Signals
 	# and the generic OpenWrt reload action do not apply its selected profile, so
-	# use the procd-managed restart path without coupling this service to daed
-	# credentials. If daed is stopped, its next start will detect the live route.
+	# use the procd-managed restart path. If daed is stopped, its next start will
+	# detect the live route.
 	pid="$(pgrep -f '^/usr/bin/daed run([[:space:]]|$)' 2>/dev/null | head -n 1)"
-	if [ -z "$pid" ]; then
-		store_daed_exit_state "$current"
-		logger -t "$TAG" "daed IPv4 exit changed ${previous}->${current}; daemon is not running"
-		return 0
+	if [ -n "$pid" ] && [ -x /etc/init.d/daed ]; then
+		if /etc/init.d/daed restart >/dev/null 2>&1; then
+			logger -t "$TAG" "restarted daed after IPv4 exit changed ${previous}->${current}"
+		else
+			logger -t "$TAG" "failed to restart daed after IPv4 exit changed ${previous}->${current}"
+		fi
 	fi
-	if [ ! -x /etc/init.d/daed ] || ! /etc/init.d/daed restart >/dev/null 2>&1; then
-		logger -t "$TAG" "failed to restart daed after IPv4 exit changed ${previous}->${current}"
-		return 1
-	fi
-	store_daed_exit_state "$current" || return 1
-	logger -t "$TAG" "restarted daed after IPv4 exit changed ${previous}->${current}"
+
+	# Additional user-configured proxy services (space separated UCI list).
+	# Only running services are reloaded so a stopped service is never started.
+	for svc in $(uci -q get yase_netmode.settings.proxy_services); do
+		case "$svc" in ''|*[!A-Za-z0-9_.-]*) continue ;; esac
+		[ "$svc" = "daed" ] && continue
+		[ -x "/etc/init.d/$svc" ] || continue
+		/etc/init.d/"$svc" running >/dev/null 2>&1 || continue
+		if /etc/init.d/"$svc" reload >/dev/null 2>&1 || /etc/init.d/"$svc" restart >/dev/null 2>&1; then
+			logger -t "$TAG" "reloaded $svc after IPv4 exit changed ${previous}->${current}"
+		else
+			logger -t "$TAG" "failed to reload $svc after IPv4 exit changed ${previous}->${current}"
+		fi
+	done
+
+	store_exit_state "$current" || return 1
 	return 0
 }
 
 read_live_state() {
-	local modem
 	discover_modem_interfaces
 
 	read_interface wan
@@ -188,23 +198,6 @@ read_live_state() {
 	MODEM_PRESENT="$IFACE_PRESENT"; MODEM_UP="$IFACE_UP"; MODEM_AVAILABLE="$IFACE_AVAILABLE"; MODEM_DEVICE="$IFACE_DEVICE"
 	read_interface "${MODEM6_PRIMARY:-__missing_modem6__}"
 	MODEM6_PRESENT="$IFACE_PRESENT"; MODEM6_UP="$IFACE_UP"; MODEM6_AVAILABLE="$IFACE_AVAILABLE"; MODEM6_DEVICE="$IFACE_DEVICE"
-
-	# The dedicated manager may discover the built-in MT5700M before netifd has
-	# created its network section.
-	# Treat that physical modem as present so a missing SIM or inactive data
-	# session is reported as disconnected, not as an unconfigured device.
-	if [ "$MODEM_PRESENT" != "1" ]; then
-		if [ -r /usr/share/mt5700m/usb.sh ]; then
-			. /usr/share/mt5700m/usb.sh
-			if mt5700m_usb_info >/dev/null 2>&1; then
-			MODEM_PRESENT=1
-			MODEM_DEVICE="$(mt5700m_netdev || true)"
-			if [ -n "$MODEM_DEVICE" ] && [ -d "/sys/class/net/${MODEM_DEVICE}" ]; then
-				ip -4 addr show dev "$MODEM_DEVICE" 2>/dev/null | grep -q 'inet ' && MODEM_UP=1
-			fi
-			fi
-		fi
-	fi
 
 	DEFAULT4="$(ip -4 route show default 2>/dev/null | head -n 1)"
 	DEFAULT6="$(ip -6 route show default 2>/dev/null | head -n 1)"
@@ -218,15 +211,11 @@ read_live_state() {
 }
 
 print_status() {
-	local modem_metric ipv6_owner
-
 	read_live_state
-	ipv6_owner="$(uci -q get h5000m_netmode.settings.ipv6_owner || true)"
-	modem_metric="$(uci -q get network.MT5700M.metric 2>/dev/null || uci -q get mt5700m.connection.metric 2>/dev/null || true)"
 
 	echo "mode=$mode"
 	echo "ipv6_policy=follow_preferred"
-	echo "ipv6_owner=${ipv6_owner:-none}"
+	echo "ipv6_owner=$(uci -q get yase_netmode.settings.ipv6_owner || echo none)"
 	echo "wan_present=$WAN_PRESENT"
 	echo "wan_up=$WAN_UP"
 	echo "wan6_up=$WAN6_UP"
@@ -243,18 +232,17 @@ print_status() {
 	echo "modem6_interface=$MODEM6_PRIMARY"
 	echo "active4=$ACTIVE4"
 	echo "active6=$ACTIVE6"
-	echo "daed_exit_state=$(cat "$DAED_EXIT_STATE_FILE" 2>/dev/null || echo none)"
+	echo "exit_state=$(cat "$EXIT_STATE_FILE" 2>/dev/null || echo none)"
 	echo "wan_metric=$(uci -q get network.wan.metric || true)"
 	echo "wan6_metric=$(uci -q get network.wan6.metric || true)"
-	echo "usb_metric=$(uci -q get "network.${MODEM_PRIMARY}.metric" || true)"
-	echo "usbv6_metric=$(uci -q get "network.${MODEM6_PRIMARY}.metric" || true)"
+	echo "usb_metric=$(uci -q get "network.${MODEM_PRIMARY:-usbwan}.metric" 2>/dev/null || true)"
+	echo "usbv6_metric=$(uci -q get "network.${MODEM6_PRIMARY:-usbwan6}.metric" 2>/dev/null || true)"
 	echo "wan_defaultroute=$(uci -q get network.wan.defaultroute || echo 1)"
 	echo "wan6_defaultroute=$(uci -q get network.wan6.defaultroute || echo 1)"
 	echo "wan6_auto=$(uci -q get network.wan6.auto || echo 1)"
-	echo "usb_defaultroute=$(uci -q get "network.${MODEM_PRIMARY}.defaultroute" || echo 1)"
-	echo "usbv6_defaultroute=$(uci -q get "network.${MODEM6_PRIMARY}.defaultroute" || echo 1)"
-	echo "usbv6_auto=$(uci -q get "network.${MODEM6_PRIMARY}.auto" || echo 1)"
-	echo "modem_metric=$modem_metric"
+	echo "usb_defaultroute=$(uci -q get "network.${MODEM_PRIMARY:-usbwan}.defaultroute" 2>/dev/null || echo 1)"
+	echo "usbv6_defaultroute=$(uci -q get "network.${MODEM6_PRIMARY:-usbwan6}.defaultroute" 2>/dev/null || echo 1)"
+	echo "usbv6_auto=$(uci -q get "network.${MODEM6_PRIMARY:-usbwan6}.auto" 2>/dev/null || echo 1)"
 	echo "default4=$DEFAULT4"
 	echo "default6=$DEFAULT6"
 }
@@ -292,7 +280,7 @@ align_ipv6_to_active4() {
 	local previous_owner
 
 	select_ipv6_owner
-	previous_owner="$(uci -q get h5000m_netmode.settings.ipv6_owner || true)"
+	previous_owner="$(uci -q get yase_netmode.settings.ipv6_owner || true)"
 	NETWORK_CHANGED=0
 
 	case "$IPV6_OWNER" in
@@ -312,8 +300,8 @@ align_ipv6_to_active4() {
 	esac
 
 	if [ "$previous_owner" != "$IPV6_OWNER" ]; then
-		uci -q set "h5000m_netmode.settings.ipv6_owner=${IPV6_OWNER}" || return 1
-		uci -q commit h5000m_netmode || return 1
+		uci -q set "yase_netmode.settings.ipv6_owner=${IPV6_OWNER}" || return 1
+		uci -q commit yase_netmode || return 1
 	fi
 	[ "$NETWORK_CHANGED" = "0" ] || uci -q commit network || return 1
 
@@ -362,7 +350,7 @@ release_lock() {
 }
 
 apply_policy() {
-	local wan_metric modem_metric wan4_defaultroute wan6_defaultroute modem4_defaultroute modem6_defaultroute wan6_auto modem6_auto modem section device
+	local wan_metric modem_metric wan4_defaultroute wan6_defaultroute modem4_defaultroute modem6_defaultroute wan6_auto modem6_auto section device
 
 	discover_modem_interfaces
 
@@ -394,9 +382,9 @@ apply_policy() {
 			;;
 	esac
 
-	uci -q set h5000m_netmode.settings='settings' || return 1
-	uci -q set "h5000m_netmode.settings.mode=${mode}" || return 1
-	uci -q commit h5000m_netmode || return 1
+	uci -q set yase_netmode.settings='settings' || return 1
+	uci -q set "yase_netmode.settings.mode=${mode}" || return 1
+	uci -q commit yase_netmode || return 1
 
 	set_network_option wan metric "$wan_metric" || return 1
 	set_network_option wan6 metric "$wan_metric" || return 1
@@ -416,10 +404,6 @@ apply_policy() {
 	done
 	uci -q commit network || return 1
 
-	if uci -q get mt5700m.connection >/dev/null 2>&1; then
-		uci -q set "mt5700m.connection.metric=${modem_metric}" || return 1
-		uci -q commit mt5700m || return 1
-	fi
 	return 0
 }
 
@@ -452,7 +436,7 @@ if [ "$action" = "reconcile" ]; then
 		logger -t "$TAG" "failed to align IPv6 with the active IPv4 exit"
 		exit 1
 	fi
-	if ! reload_daed_on_exit_change; then
+	if ! reload_proxies_on_exit_change; then
 		exit 1
 	fi
 	exit 0
@@ -470,12 +454,6 @@ if [ "$action" = "apply" ] || [ "$action" = "set" ]; then
 		echo "network reload failed" >&2
 		exit 1
 	fi
-	# Reconcile the dedicated manager after netifd recreates the interfaces.
-	if [ -x /usr/sbin/mt5700m-manager ] && ! /usr/sbin/mt5700m-manager sync >/dev/null 2>&1; then
-		logger -t "$TAG" "MT5700M manager sync failed after applying mode=$mode"
-		echo "MT5700M manager sync failed" >&2
-		exit 1
-	fi
 	# Route both address families through the same live exit. In priority modes
 	# this also enables IPv6 on the backup only after IPv4 has failed over.
 	sleep 1
@@ -483,7 +461,7 @@ if [ "$action" = "apply" ] || [ "$action" = "set" ]; then
 	logger -t "$TAG" "applied exit policy mode=$mode"
 fi
 
-if ! reload_daed_on_exit_change; then
+if ! reload_proxies_on_exit_change; then
 	exit 1
 fi
 

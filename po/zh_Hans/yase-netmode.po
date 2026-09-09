@@ -1,91 +1,22 @@
 msgid ""
 msgstr ""
-"Project-Id-Version: luci-app-h5000m-netmode 1.2.1\n"
-"PO-Revision-Date: 2026-07-15 00:00+0800\n"
-"Last-Translator: FAN789\n"
+"Project-Id-Version: luci-app-yase-netmode 1.0.0\n"
+"PO-Revision-Date: 2026-09-09 12:00+0800\n"
+"Last-Translator: YASE\n"
 "Language-Team: Chinese (Simplified)\n"
 "Language: zh_CN\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 
-msgid "Mobile Network"
-msgstr "移动网络"
-
-msgid "Exit Priority"
-msgstr "出口优先级"
-
-msgid "Switch the default route priority between wired WAN and the 5G modem."
-msgstr "切换有线 WAN 与 5G 模块的默认出口优先级。"
-
-msgid "Exit Mode"
-msgstr "出口模式"
-
-msgid "Wired WAN first, 5G fallback"
-msgstr "有线 WAN 优先，5G 备用"
-
-msgid "5G modem first, wired WAN fallback"
-msgstr "5G 模块优先，有线 WAN 备用"
-
-msgid "Wired WAN only"
-msgstr "仅有线 WAN"
-
-msgid "5G modem only"
-msgstr "仅 5G 模块"
-
-msgid "Current Status"
-msgstr "当前状态"
-
-msgid "Current Mode"
-msgstr "当前模式"
-
-msgid "IPv4 Default Route"
-msgstr "IPv4 默认出口"
-
-msgid "IPv6 Default Route"
-msgstr "IPv6 默认出口"
-
-msgid "Unknown"
-msgstr "未知"
-
-msgid "None"
-msgstr "无"
-
-msgid "Wired WAN Metric"
-msgstr "有线 WAN metric"
-
-msgid "5G Modem Metric"
-msgstr "5G 模块 metric"
-
-msgid "Wired WAN Default Route"
-msgstr "有线 WAN 默认路由"
-
-msgid "5G Modem Default Route"
-msgstr "5G 模块默认路由"
-
-msgid "Disabled"
-msgstr "已停用"
-
-msgid "Enabled"
-msgstr "开启"
-
-msgid "Exit priority has been applied."
-msgstr "出口优先级已应用。"
-
-msgid "Failed to apply exit priority:"
-msgstr "出口优先级应用失败："
-
-msgid "Network exits"
-msgstr "网络出口"
-
-msgid "Choose how wired WAN and the 5G modem share Internet traffic."
-msgstr "设置有线 WAN 与 5G 模块的使用顺序和备用关系。"
+msgid "Network Mode"
+msgstr "网络模式"
 
 msgid "Wired WAN"
 msgstr "有线 WAN"
 
 msgid "5G modem"
-msgstr "5G 模块"
+msgstr "5G 蜂窝"
 
 msgid "Other route"
 msgstr "其他路由"
@@ -159,29 +90,14 @@ msgstr "当前出口：%s"
 msgid "IPv4: %s · IPv6: %s"
 msgstr "IPv4：%s · IPv6：%s"
 
-msgid "Usage policy"
-msgstr "使用策略"
-
-msgid "The preferred exit is used whenever it is available. A fallback exit takes over automatically."
-msgstr "首选出口可用时优先使用；首选出口断开后，备用出口会自动接管。"
-
-msgid "Exit policy"
-msgstr "出口策略"
-
-msgid "Using only one exit disables automatic fallback."
-msgstr "选择“仅使用”模式后不会自动切换到另一条线路。"
-
-msgid "Exit policy applied successfully."
-msgstr "出口策略已成功应用。"
-
-msgid "Failed to apply exit policy:"
-msgstr "出口策略应用失败："
-
 msgid "Unknown error"
 msgstr "未知错误"
 
 msgid "Not selected"
 msgstr "未选择"
+
+msgid "Network exits"
+msgstr "网络出口"
 
 msgid "Click the connection cards to set the order. The first is preferred and the second is fallback."
 msgstr "点击线路卡片设置使用顺序；第一条为首选出口，第二条为备用出口。"

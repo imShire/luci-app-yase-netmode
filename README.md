@@ -1,41 +1,71 @@
-# H5000M Network Priority
+# luci-app-yase-netmode
 
-[![CI](https://github.com/FAN789/luci-app-h5000m-netmode/actions/workflows/ci.yml/badge.svg)](https://github.com/FAN789/luci-app-h5000m-netmode/actions/workflows/ci.yml)
-[![Build Release](https://github.com/FAN789/luci-app-h5000m-netmode/actions/workflows/release.yml/badge.svg)](https://github.com/FAN789/luci-app-h5000m-netmode/actions/workflows/release.yml)
-
-面向 Hiveton H5000M 的 OpenWrt 出口优先级管理器。用户可直接点击有线 WAN 和
-5G 两张出口卡片决定启用范围及优先顺序，服务会据此维护接口状态和默认路由。
-
-版本采用标准的 `主版本.次版本.修订版本-r打包修订` 格式。GitHub Release 使用
-语义版本标签（当前为 `v1.3.1`），OpenWrt 安装包版本为 `1.3.1-r2`。
+有线宽带（wan）与 5G 蜂窝（usbwan）双链路的出口模式切换插件，fork 自
+[FAN789/luci-app-h5000m-netmode](https://github.com/FAN789/luci-app-h5000m-netmode)
+（Apache-2.0），针对 JDCloud RE-SS-01（ImmortalWrt, qualcommax/ipq60xx）适配。
 
 ## 功能
 
-- 有线 WAN 优先、5G 优先、仅有线和仅 5G 四种策略
-- 卡片式直接选择，当前出口和链路状态即时反馈
-- 接口 Hotplug 自动重算，链路恢复后无需人工干预
-- 默认出口变化时自动触发已安装代理服务的重载，无需手工重新应用
-- 自动约束 IPv6 出口，避免 IPv4 走 WAN、IPv6 意外走 5G
-- 只读状态查询与策略写入分权，普通监控账号不能改写出口策略
-- 升级时保留 `/etc/config/h5000m_netmode`
-- UCI 持久化配置和简体中文 LuCI 界面
-- 不依赖云服务，不收集或上传网络数据
+- 四种出口策略：有线 WAN 优先（`wan_first`）、5G 优先（`modem_first`）、
+  仅有线（`wan_only`）、仅 5G（`modem_only`）
+- 卡片式 LuCI 界面（网络 → 网络模式），5 秒轮询当前出口与链路状态
+- 接口 hotplug 自动重算，链路恢复后无需人工干预
+- IPv6 自动跟随 IPv4 出口（避免 IPv4 走 WAN、IPv6 走 5G 的分流）
+- 默认出口变化时自动重载代理服务（内置 daed，额外服务用
+  `list proxy_services` 配置）
+- UCI 持久化 `/etc/config/yase_netmode`，sysupgrade 保留
+- 不依赖 mwan3、不依赖云服务、不收集任何数据
 
-## 编译
+## 与原插件的区别
+
+| 项目 | h5000m-netmode | yase-netmode |
+|---|---|---|
+| 5G 接口 | 扫描 MT5700M/USB section | 固定 `usbwan`，IPv6 探测 `usbwan6`/`@usbwan` |
+| 代理联动 | 仅硬编码 daed | daed + 可配置 `proxy_services` 列表 |
+| ACL | 可写 network/mt5700m | 只写 yase_netmode |
+| 菜单 | 网络 → Mobile Network | 网络 → 网络模式 |
+
+## 安装
+
+本项目针对使用 `apk` 的 ImmortalWrt 构建真实 APK。推荐通过 GitHub Actions 的
+`Build Release` workflow 构建，不要使用旧的本地 `build-ipk.sh`。
 
 ```sh
-git clone https://github.com/FAN789/luci-app-h5000m-netmode.git \
-  package/luci-app-h5000m-netmode
-make menuconfig
-# LuCI -> Applications -> luci-app-h5000m-netmode
-make package/luci-app-h5000m-netmode/compile V=s
+# 上传 GitHub 后，打 tag（tag 必须和 Makefile 的 PKG_VERSION 一致）
+git tag v1.0.0
+git push origin v1.0.0
 ```
 
-GitHub Releases 中的软件包由 GitHub Actions 使用官方 OpenWrt SNAPSHOT
-`mediatek/filogic` SDK 在线构建，附带中文包、SDK 构建公钥和 SHA256 校验文件。
-软件包应安装到 ABI 匹配的近期 SNAPSHOT 固件。
+Actions 完成后会生成两个包：
 
-配置文件为 `/etc/config/h5000m_netmode`，后端命令为
-`/usr/sbin/h5000m-netmode`，LuCI 页面位于“移动网络 → 出口优先级”。
+```text
+luci-app-yase-netmode-1.0.0-r1.apk
+luci-i18n-yase-netmode-zh-cn-*.apk
+```
 
-本项目采用 [Apache License 2.0](LICENSE)。
+在路由器上安装（包由你自己的 GitHub Actions 构建）：
+
+```sh
+apk add --allow-untrusted /tmp/luci-app-yase-netmode-1.0.0-r1.apk
+apk add --allow-untrusted /tmp/luci-i18n-yase-netmode-*.apk
+```
+
+如果以后把包发布到自己的 APK 仓库，应使用仓库签名公钥安装，而不是长期使用
+`--allow-untrusted`。安装完成后强制刷新 LuCI（Ctrl+F5）。
+
+## 本地静态检查
+
+```sh
+sh -n root/etc/hotplug.d/iface/95-yase-netmode
+sh -n root/etc/uci-defaults/90-yase-netmode
+sh -n root/usr/sbin/yase-netmode
+node --check htdocs/luci-static/resources/view/yase_netmode/netmode.js
+```
+
+## 注意
+
+- 切换基于 netifd metric / defaultroute，只感知接口层 up/down；
+  “接口在线但公网不通”不会触发切换。
+- 切换时已有 TCP 连接会因源地址变化而断开（属自动恢复，非完全无缝）。
+- 构建脚本使用 ImmortalWrt `qualcommax/ipq60xx` snapshot SDK，并通过 SDK 生成 APK。
+- 目标固件版本如不是当前 snapshot，建议把 `IMMORTALWRT_SDK_BASE_URL` 指向完全匹配的 SDK 目录。

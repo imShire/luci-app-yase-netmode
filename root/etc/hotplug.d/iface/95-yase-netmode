@@ -6,12 +6,12 @@ case "$ACTION" in
 esac
 
 case "$INTERFACE" in
-	wan|wan6) ;;
+	wan|wan6|usbwan|usbwan6|@usbwan) ;;
 	*)
+		# Also watch custom interfaces stacked on the 5G uplink.
 		[ -n "$INTERFACE" ] || exit 0
-		modem_config="$(uci -q get "network.${INTERFACE}.modem_config" || true)"
-		managed_by="$(uci -q get "network.${INTERFACE}.managed_by" || true)"
-		[ -n "$modem_config" ] || [ "$managed_by" = 'mt5700m' ] || exit 0
+		device="$(uci -q get "network.${INTERFACE}.device" || uci -q get "network.${INTERFACE}.ifname" || true)"
+		[ "$device" = "@usbwan" ] || exit 0
 		;;
 esac
 
@@ -19,7 +19,7 @@ esac
 # which IPv6 client should be active. The command is idempotent and locked.
 (
 	sleep 1
-	/usr/sbin/h5000m-netmode reconcile >/dev/null 2>&1
+	/usr/sbin/yase-netmode reconcile >/dev/null 2>&1
 ) &
 
 exit 0

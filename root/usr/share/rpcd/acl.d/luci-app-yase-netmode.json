@@ -1,0 +1,17 @@
+{
+	"luci-app-yase-netmode": {
+		"description": "Grant access to YASE network mode settings",
+		"read": {
+			"file": {
+				"/usr/sbin/yase-netmode-status": [ "exec" ]
+			},
+			"uci": [ "yase_netmode", "network" ]
+		},
+		"write": {
+			"file": {
+				"/usr/sbin/yase-netmode": [ "exec" ]
+			},
+			"uci": [ "yase_netmode" ]
+		}
+	}
+}
