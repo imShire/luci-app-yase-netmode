@@ -9,6 +9,11 @@ TAG="yase-netmode"
 LOCK_DIR="/var/lock/yase-netmode.lock"
 EXIT_STATE_FILE="/var/run/yase-netmode.exit"
 
+# Off-link targets used to ask the kernel which exit it would really use. Any
+# globally routable address works; these are only ever looked up, never sent to.
+PROBE4="1.1.1.1"
+PROBE6="2606:4700:4700::1111"
+
 mode="$(uci -q get yase_netmode.settings.mode || echo wan_first)"
 
 normalize_mode() {
@@ -89,6 +94,36 @@ read_interface() {
 
 route_device() {
 	printf '%s\n' "$1" | sed -n 's/.* dev \([^ ]*\).*/\1/p'
+}
+
+# The default route the kernel actually prefers, i.e. the one with the lowest
+# metric. `ip route show default` lists every default route (the priority modes
+# give both uplinks one) and its order is not metric sorted, so picking the
+# first line can select the route that is losing.
+best_default_route() {
+	ip "-$1" route show default 2>/dev/null | awk '
+		{
+			metric = 0; device = ""
+			for (i = 1; i < NF; i++) {
+				if ($i == "metric") metric = $(i + 1)
+				if ($i == "dev") device = $(i + 1)
+			}
+			if (device == "") next
+			if (found == 0 || metric < best_metric) {
+				found = 1; best_metric = metric; best = $0
+			}
+		}
+		END { if (found) print best }
+	'
+}
+
+# Device behind the route a lookup for an off-link target resolves to. This is
+# authoritative during a failover, when the losing route may still be in the
+# table while the winning one is already being installed.
+lookup_exit_device() {
+	ip "-$1" route get "$2" 2>/dev/null \
+		| sed -n 's/.* dev \([^ ]*\).*/\1/p' \
+		| head -n 1
 }
 
 has_default_route() {
@@ -188,6 +223,8 @@ reload_proxies_on_exit_change() {
 }
 
 read_live_state() {
+	local device
+
 	discover_modem_interfaces
 
 	read_interface wan
@@ -199,10 +236,19 @@ read_live_state() {
 	read_interface "${MODEM6_PRIMARY:-__missing_modem6__}"
 	MODEM6_PRESENT="$IFACE_PRESENT"; MODEM6_UP="$IFACE_UP"; MODEM6_AVAILABLE="$IFACE_AVAILABLE"; MODEM6_DEVICE="$IFACE_DEVICE"
 
-	DEFAULT4="$(ip -4 route show default 2>/dev/null | head -n 1)"
-	DEFAULT6="$(ip -6 route show default 2>/dev/null | head -n 1)"
-	ACTIVE4="$(route_owner "$(route_device "$DEFAULT4")")"
-	ACTIVE6="$(route_owner "$(route_device "$DEFAULT6")")"
+	DEFAULT4="$(best_default_route 4)"
+	DEFAULT6="$(best_default_route 6)"
+
+	# A route lookup answers "which exit is in use" directly, instead of
+	# inferring it from a default-route listing that still holds the route of a
+	# link that has just gone away.
+	device="$(lookup_exit_device 4 "$PROBE4")"
+	[ -n "$device" ] || device="$(route_device "$DEFAULT4")"
+	ACTIVE4="$(route_owner "$device")"
+
+	device="$(lookup_exit_device 6 "$PROBE6")"
+	[ -n "$device" ] || device="$(route_device "$DEFAULT6")"
+	ACTIVE6="$(route_owner "$device")"
 	WAN4_READY=0; WAN6_READY=0; MODEM4_READY=0; MODEM6_READY=0
 	has_default_route 4 "$WAN_DEVICE" && WAN4_READY=1
 	has_default_route 6 "${WAN6_DEVICE:-$WAN_DEVICE}" && WAN6_READY=1

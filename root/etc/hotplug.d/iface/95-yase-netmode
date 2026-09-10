@@ -17,9 +17,24 @@ esac
 
 # Let netifd finish adding or removing the IPv4 default route before deciding
 # which IPv6 client should be active. The command is idempotent and locked.
+#
+# A single pass is not enough. netifd removes the losing default route and
+# installs the winning one at different moments, so a pass that lands in
+# between reads the exit that is on its way out -- and whatever it latches
+# stays latched until the next link event. Reconcile until two consecutive
+# readings agree, which is bounded and cheap when the state is already stable.
 (
 	sleep 1
-	/usr/sbin/yase-netmode reconcile >/dev/null 2>&1
+	previous=""
+	for _ in 1 2 3 4 5; do
+		/usr/sbin/yase-netmode reconcile >/dev/null 2>&1
+		current="$(/usr/sbin/yase-netmode status 2>/dev/null | sed -n 's/^active4=//p')"
+		if [ -n "$previous" ] && [ "$current" = "$previous" ]; then
+			break
+		fi
+		previous="$current"
+		sleep 2
+	done
 ) &
 
 exit 0
