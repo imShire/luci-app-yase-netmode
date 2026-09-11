@@ -428,10 +428,6 @@ apply_policy() {
 			;;
 	esac
 
-	uci -q set yase_netmode.settings='settings' || return 1
-	uci -q set "yase_netmode.settings.mode=${mode}" || return 1
-	uci -q commit yase_netmode || return 1
-
 	set_network_option wan metric "$wan_metric" || return 1
 	set_network_option wan6 metric "$wan_metric" || return 1
 	set_network_option wan norelease 1 || return 1
@@ -451,6 +447,41 @@ apply_policy() {
 	uci -q commit network || return 1
 
 	return 0
+}
+
+# Persist the mode. Kept out of apply_policy so the caller decides when it is
+# safe to write: print_status reports this value as the applied policy, so it
+# must not be written until the network has actually taken it.
+commit_mode() {
+	uci -q set yase_netmode.settings='settings' || return 1
+	uci -q set "yase_netmode.settings.mode=${mode}" || return 1
+	if ! uci -q commit yase_netmode; then
+		# Drop the staged mode. uci commits the whole pending delta of a
+		# package, so any later commit of yase_netmode would fold in the mode
+		# we just failed to persist -- align_ipv6_to_active4 makes exactly
+		# such a commit when the caller rolls the network back, which would
+		# restore the half-state this ordering exists to avoid.
+		uci -q revert yase_netmode
+		return 1
+	fi
+
+	return 0
+}
+
+# Put the network options back to those of mode $1 and make them live again.
+# apply_policy is a pure function of $mode writing the same options
+# idempotently, so re-running it is enough -- no snapshot of the eight options
+# is needed. A failure here is logged but not fatal: the caller is already
+# exiting non-zero, the mode was never persisted, and the next hotplug
+# reconcile or reboot re-applies from the restored UCI.
+rollback_policy() {
+	mode="$1"
+	normalize_mode
+	apply_policy || logger -t "$TAG" "rollback of network options failed"
+	/etc/init.d/network reload >/dev/null 2>&1 || logger -t "$TAG" "rollback reload failed"
+	# Re-derive the IPv6 owner from the restored live state, so the rollback
+	# lands in the same shape a normal apply would have produced.
+	align_ipv6_to_active4 || true
 }
 
 normalize_mode
@@ -488,18 +519,46 @@ if [ "$action" = "reconcile" ]; then
 	exit 0
 fi
 
+# Only set/apply take the policy live. Invoked with no action (uci-defaults on
+# install) the script just writes the options for whatever mode is already in
+# UCI, so there is nothing to reload and nothing to roll back.
+applies=0
+case "$action" in
+	apply|set) applies=1 ;;
+esac
+
+previous_mode="$(uci -q get yase_netmode.settings.mode || echo wan_first)"
+
 if ! apply_policy; then
 	logger -t "$TAG" "failed to persist exit policy mode=$mode"
 	echo "failed to persist exit policy" >&2
 	exit 1
 fi
 
-if [ "$action" = "apply" ] || [ "$action" = "set" ]; then
+if [ "$applies" = "1" ]; then
+	# The reload is what makes the policy live, so the mode is persisted only
+	# after it succeeds. Writing it first would leave UCI advertising a policy
+	# the network never took, which the status page would then report as the
+	# applied one.
 	if ! /etc/init.d/network reload >/dev/null 2>&1; then
-		logger -t "$TAG" "network reload failed after applying mode=$mode"
+		logger -t "$TAG" "network reload failed after applying mode=$mode, rolling back to mode=$previous_mode"
+		rollback_policy "$previous_mode"
 		echo "network reload failed" >&2
 		exit 1
 	fi
+fi
+
+if ! commit_mode; then
+	logger -t "$TAG" "failed to persist exit policy mode=$mode"
+	if [ "$applies" = "1" ]; then
+		logger -t "$TAG" "rolling network options back to mode=$previous_mode"
+		rollback_policy "$previous_mode"
+	fi
+	echo "failed to persist exit policy" >&2
+	exit 1
+fi
+
+if [ "$applies" = "1" ]; then
 	# Route both address families through the same live exit. In priority modes
 	# this also enables IPv6 on the backup only after IPv4 has failed over.
 	sleep 1
