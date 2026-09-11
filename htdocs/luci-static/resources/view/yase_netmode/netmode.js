@@ -167,8 +167,21 @@ return view.extend({
 		return _('Traffic is currently using another default route.');
 	},
 
+	applyErrText: function(err) {
+		var message = (err && err.message) || '';
+
+		if (message.indexOf('another exit policy update is already running') > -1)
+			return _('Another exit policy update is running. Try again in a moment.');
+		if (message.indexOf('network reload failed') > -1)
+			return _('The mode was not saved and the network reload failed. Retry, or check the system log.');
+		if (message.indexOf('failed to persist exit policy') > -1)
+			return _('Failed to save the exit policy.');
+
+		return _('Failed to apply exit selection:') + ' ' + (message || _('Unknown error'));
+	},
+
 	applySelection: function() {
-		if (this.applying || this.pendingMode === this.liveData.mode) return;
+		if (this.applying || this.pendingMode === this.baselineMode) return;
 		this.applying = true;
 		this.repaint();
 
@@ -184,7 +197,7 @@ return view.extend({
 		}, this), L.bind(function(err) {
 			this.applying = false;
 			this.repaint();
-			ui.addNotification(null, E('p', _('Failed to apply exit selection:') + ' ' + (err.message || _('Unknown error'))), 'danger');
+			ui.addNotification(null, E('p', this.applyErrText(err)), 'danger');
 		}, this));
 	},
 
@@ -197,7 +210,7 @@ return view.extend({
 		active = data.active4 !== 'none' ? data.active4 : data.active6;
 		badgeText = same ? _('Current exit: %s').format(this.exitLabel(active)) : _('IPv4: %s · IPv6: %s').format(this.exitLabel(data.active4), this.exitLabel(data.active6));
 		badgeClass = 'h5net-active' + (active === 'none' ? ' fail' : (active === 'other' ? ' warn' : ''));
-		changed = this.pendingMode !== data.mode;
+		changed = this.pendingMode !== this.baselineMode;
 
 		return E('div', { 'class': 'h5net', id: 'h5net-status' }, [
 			this.styleNode(),
@@ -226,8 +239,7 @@ return view.extend({
 	refreshStatus: function() {
 		return this.statusCommand().then(L.bind(function(res) {
 			this.liveData = this.parseStatus(res);
-			if (!this.selecting && !this.applying)
-				this.pendingMode = this.liveData.mode || 'wan_first';
+			this.baselineMode = this.liveData.mode || 'wan_first';
 			this.repaint();
 		}, this));
 	},
@@ -235,8 +247,8 @@ return view.extend({
 	render: function(res) {
 		this.liveData = this.parseStatus(res);
 		this.liveData.mode = this.liveData.mode || 'wan_first';
-		this.pendingMode = this.liveData.mode;
-		this.selecting = false;
+		this.baselineMode = this.liveData.mode;
+		this.pendingMode = this.baselineMode;
 		this.applying = false;
 		poll.add(L.bind(this.refreshStatus, this), 5);
 		return this.statusPanel(this.liveData);
