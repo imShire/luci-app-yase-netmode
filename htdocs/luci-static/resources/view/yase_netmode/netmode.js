@@ -48,8 +48,27 @@ return view.extend({
 			'.h5net-name h3{margin:0 0 2px;font-size:16px}.h5net-role{color:var(--text-color-medium,#666);font-size:12px}.h5net-card.selected .h5net-role{color:var(--net-blue-t);font-weight:600}',
 			'.h5net-state{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:600;color:var(--net-red-t);white-space:nowrap}.h5net-state:before{content:"";width:7px;height:7px;border-radius:50%;background:currentColor}.h5net-state.up{color:var(--net-green-t)}.h5net-state.idle{color:var(--text-color-medium,#666)}',
 			'.h5net-protos{display:flex;flex-wrap:wrap;gap:7px;margin-top:15px}.h5net-proto{padding:5px 8px;border-radius:7px;background:var(--background-color-low,#f5f5f5);font-size:12px;color:var(--text-color-medium,#666)}.h5net-proto.current{background:rgba(49,185,133,.11);color:var(--net-green-t);font-weight:600}',
-			'.h5net-actions{display:flex;justify-content:flex-end;align-items:center;margin-top:14px;padding-top:14px;border-top:1px solid var(--border-color-low,#e8e8e8)}.h5net-actions .cbi-button{min-width:112px}',
-			'@media(max-width:620px){.h5net-head{display:block}.h5net-active{margin-top:11px}.h5net-grid{grid-template-columns:1fr}.h5net-actions .cbi-button{width:100%}}'
+			'.h5net-chooser{margin-top:18px}',
+			'.h5net-chooser-title{margin:0 0 10px;font-size:15px}',
+			'.h5net-matrix{display:grid;grid-template-columns:auto minmax(0,1fr) minmax(0,1fr);grid-template-rows:auto 1fr 1fr;gap:8px}',
+			'.h5net-corner{grid-column:1;grid-row:1}',
+			'.h5net-colhead{display:flex;align-items:flex-end;justify-content:center;padding-bottom:2px;font-size:12px;font-weight:600;color:var(--text-color-medium,#555)}',
+			'.h5net-colhead.c1{grid-column:2;grid-row:1}.h5net-colhead.c2{grid-column:3;grid-row:1}',
+			'.h5net-rowhead{display:flex;align-items:center;max-width:110px;padding-right:6px;font-size:12px;font-weight:600;color:var(--text-color-medium,#555)}',
+			'.h5net-rowhead.r1{grid-column:1;grid-row:2}.h5net-rowhead.r2{grid-column:1;grid-row:3}',
+			'.h5net-opt{position:relative;display:flex;flex-direction:column;justify-content:center;gap:3px;min-height:56px;padding:10px 12px;border:1px solid var(--border-color-medium,#ddd);border-radius:10px;background:var(--background-color-high,#fff);cursor:pointer;transition:border-color .18s,box-shadow .18s,background-color .18s}',
+			'.h5net-opt.c1.r1{grid-column:2;grid-row:2}.h5net-opt.c2.r1{grid-column:3;grid-row:2}.h5net-opt.c1.r2{grid-column:2;grid-row:3}.h5net-opt.c2.r2{grid-column:3;grid-row:3}',
+			'.h5net-opt input{position:absolute;width:1px;height:1px;margin:0;padding:0;border:0;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}',
+			'.h5net-opt:focus-within{outline:2px solid var(--net-blue);outline-offset:2px}',
+			'@media(hover:hover){.h5net-opt:hover{border-color:rgba(79,143,247,.5)}}',
+			'.h5net-opt[data-checked="1"]{border-color:rgba(79,143,247,.72);background:rgba(79,143,247,.06);box-shadow:0 0 0 2px rgba(79,143,247,.08)}',
+			'.h5net-opt-t{font-size:13px;font-weight:600}.h5net-opt[data-checked="1"] .h5net-opt-t{color:var(--net-blue-t)}',
+			'.h5net-opt-d{font-size:12px;line-height:1.35;color:var(--text-color-medium,#666)}',
+			'.h5net-actions{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-top:14px;padding-top:14px;border-top:1px solid var(--border-color-low,#e8e8e8)}.h5net-actions .cbi-button{min-width:112px}',
+			'.h5net-hint-wrap{display:flex;align-items:center;gap:10px;min-width:0}',
+			'.h5net-hint{font-size:12px;color:var(--net-amber-t)}',
+			'.h5net-reset{padding:0;border:0;background:none;font-size:12px;color:var(--net-blue-t);text-decoration:underline;cursor:pointer;white-space:nowrap}',
+			'@media(max-width:600px){.h5net-head{display:block}.h5net-active{margin-top:11px}.h5net-grid{grid-template-columns:1fr}.h5net-matrix{grid-template-columns:minmax(0,1fr) minmax(0,1fr);grid-template-rows:auto auto auto auto auto}.h5net-corner{display:none}.h5net-colhead.c1{grid-column:1;grid-row:2}.h5net-colhead.c2{grid-column:2;grid-row:2}.h5net-rowhead{max-width:none;padding:6px 0 0}.h5net-rowhead.r1{grid-column:1/-1;grid-row:1}.h5net-rowhead.r2{grid-column:1/-1;grid-row:4}.h5net-opt.c1.r1{grid-column:1;grid-row:3}.h5net-opt.c2.r1{grid-column:2;grid-row:3}.h5net-opt.c1.r2{grid-column:1;grid-row:5}.h5net-opt.c2.r2{grid-column:2;grid-row:5}.h5net-actions{display:block}.h5net-hint-wrap{margin-bottom:8px}.h5net-actions .cbi-button{width:100%}}'
 		].join(''));
 	},
 
@@ -72,11 +91,47 @@ return view.extend({
 		return [ 'wan', 'modem' ];
 	},
 
+	modeOptions: function() {
+		return [
+			{
+				mode: 'wan_first', col: 'c1', row: 'r1',
+				title: _('Wired WAN preferred'),
+				desc: _('Uses wired WAN. Switches to 5G automatically when it goes down.')
+			},
+			{
+				mode: 'modem_first', col: 'c2', row: 'r1',
+				title: _('5G preferred'),
+				desc: _('Uses 5G. Switches to wired WAN automatically when it goes down.')
+			},
+			{
+				mode: 'wan_only', col: 'c1', row: 'r2',
+				title: _('Wired WAN only'),
+				desc: _('Uses wired WAN only. The 5G link stays disabled.')
+			},
+			{
+				mode: 'modem_only', col: 'c2', row: 'r2',
+				title: _('5G only'),
+				desc: _('Uses 5G only. The wired WAN link stays disabled.')
+			}
+		];
+	},
+
+	modeLink: function(mode) {
+		if (mode === 'modem_first' || mode === 'modem_only') return 'modem';
+		return 'wan';
+	},
+
+	modeIsExclusive: function(mode) {
+		return mode === 'wan_only' || mode === 'modem_only';
+	},
+
 	roleLabel: function(mode, kind) {
 		var order = this.modeOrder(mode);
 		var position = order.indexOf(kind);
-		if (position < 0) return _('Not selected');
+
+		if (position < 0) return _('Disabled by policy');
 		if (order.length === 1) return _('Only exit');
+
 		return position === 0 ? '1 · ' + _('Preferred exit') : '2 · ' + _('Fallback exit');
 	},
 
@@ -84,6 +139,82 @@ return view.extend({
 		if (present !== '1') return { label: _('Not configured'), cls: 'idle' };
 		if (up === '1') return { label: _('Connected'), cls: 'up' };
 		return { label: _('Disconnected'), cls: '' };
+	},
+
+	linkUsable: function(kind, data) {
+		var modem = kind === 'modem';
+		var present = modem ? data.modem_present : data.wan_present;
+		var up4 = modem ? data.modem_up : data.wan_up;
+		var up6 = modem ? data.modem6_up : data.wan6_up;
+
+		return present === '1' && (up4 === '1' || up6 === '1');
+	},
+
+	describeUnavailable: function(kind, data) {
+		var modem = kind === 'modem';
+		var present = modem ? data.modem_present : data.wan_present;
+
+		if (present !== '1')
+			return _('%s is not configured on this device. Choosing it as the only exit leaves no working route until it comes back.').format(modem ? _('5G modem') : _('Wired WAN'));
+
+		return _('%s is currently down. Choosing it as the only exit leaves no working route until it comes back.').format(modem ? _('5G modem') : _('Wired WAN'));
+	},
+
+	confirmUnavailable: function(kind) {
+		var text = this.describeUnavailable(kind, this.liveData);
+		var settled = false;
+
+		return new Promise(function(resolve) {
+			function answer(confirmed) {
+				if (settled) return;
+				settled = true;
+				ui.hideModal();
+				resolve(confirmed);
+			}
+
+			ui.showModal(_('The selected link is not available'), [
+				E('p', {}, text),
+				E('div', { 'class': 'right' }, [
+					E('button', { 'class': 'btn', 'click': function() { answer(false); } }, _('Cancel')),
+					' ',
+					E('button', { 'class': 'cbi-button cbi-button-action', 'click': function() { answer(true); } }, _('Continue'))
+				])
+			]);
+		});
+	},
+
+	selectMode: function(mode) {
+		this.pendingMode = mode;
+		this.selectionBase = this.baselineMode;
+		this.updatePanel();
+	},
+
+	resetSelection: function() {
+		this.selectMode(this.baselineMode);
+	},
+
+	onModeSelect: function(mode) {
+		var self = this;
+		var kind;
+
+		if (this.applying || mode === this.pendingMode) return;
+
+		if (!this.modeIsExclusive(mode)) {
+			this.selectMode(mode);
+			return;
+		}
+
+		kind = this.modeLink(mode);
+
+		if (this.linkUsable(kind, this.liveData)) {
+			this.selectMode(mode);
+			return;
+		}
+
+		this.confirmUnavailable(kind).then(function(confirmed) {
+			if (confirmed) self.selectMode(mode);
+			else self.updatePanel();
+		});
 	},
 
 	cardNode: function(kind) {
@@ -117,13 +248,13 @@ return view.extend({
 		var up6 = modem ? data.modem6_up : data.wan6_up;
 		var ready4 = modem ? (data.modem4_ready || up4) : (data.wan4_ready || up4);
 		var ready6 = modem ? (data.modem6_ready || up6) : (data.wan6_ready || up6);
-		var selected = this.modeOrder(this.pendingMode).indexOf(kind) > -1;
+		var selected = this.modeOrder(this.baselineMode).indexOf(kind) > -1;
 		var active4 = data.active4 === kind;
 		var active6 = data.active6 === kind;
 		var state = this.connectionState(present, (up4 === '1' || up6 === '1') ? '1' : '0');
 
 		ui.card.className = 'h5net-card ' + (modem ? 'modem' : 'wan') + (selected ? ' selected' : ' unselected') + ((active4 || active6) ? ' active' : '');
-		ui.role.textContent = this.roleLabel(this.pendingMode, kind);
+		ui.role.textContent = this.roleLabel(this.baselineMode, kind);
 		ui.state.className = 'h5net-state ' + state.cls;
 		ui.state.textContent = state.label;
 		ui.proto4.className = 'h5net-proto' + (active4 ? ' current' : '');
@@ -172,6 +303,7 @@ return view.extend({
 
 		return fs.exec('/usr/sbin/yase-netmode', [ 'set', this.pendingMode ]).then(L.bind(function() {
 			ui.addNotification(null, E('p', _('Exit selection applied successfully.')));
+			this.selectionBase = this.pendingMode;
 			return new Promise(L.bind(function(resolve) {
 				window.setTimeout(L.bind(function() {
 					this.applying = false;
@@ -185,36 +317,91 @@ return view.extend({
 		}, this));
 	},
 
+	buildChooser: function() {
+		var defs = this.modeOptions();
+		var options = [];
+		var matrix = E('div', { 'class': 'h5net-matrix', 'role': 'group', 'aria-labelledby': 'h5net-chooser-title' }, [
+			E('div', { 'class': 'h5net-corner', 'aria-hidden': 'true' }),
+			E('div', { 'class': 'h5net-colhead c1', 'aria-hidden': 'true' }, _('Wired WAN')),
+			E('div', { 'class': 'h5net-colhead c2', 'aria-hidden': 'true' }, _('5G modem')),
+			E('div', { 'class': 'h5net-rowhead r1', 'aria-hidden': 'true' }, _('Automatic failover')),
+			E('div', { 'class': 'h5net-rowhead r2', 'aria-hidden': 'true' }, _('Force a single exit'))
+		]);
+		var i, def, input, label;
+
+		for (i = 0; i < defs.length; i++) {
+			def = defs[i];
+			input = E('input', {
+				'type': 'radio',
+				'name': 'h5net-mode',
+				'value': def.mode,
+				'change': L.bind(this.onModeSelect, this, def.mode)
+			});
+			label = E('label', { 'class': 'h5net-opt ' + def.col + ' ' + def.row }, [
+				input,
+				E('span', { 'class': 'h5net-opt-t' }, def.title),
+				E('span', { 'class': 'h5net-opt-d' }, def.desc)
+			]);
+
+			matrix.appendChild(label);
+			options.push({ mode: def.mode, input: input, label: label });
+		}
+
+		return {
+			options: options,
+			node: E('div', { 'class': 'h5net-chooser' }, [
+				E('h3', { 'class': 'h5net-chooser-title', 'id': 'h5net-chooser-title' }, _('Exit mode')),
+				matrix
+			])
+		};
+	},
+
 	buildPanel: function() {
 		var wan = this.cardNode('wan');
 		var modem = this.cardNode('modem');
 		var badge = E('div', { 'class': 'h5net-active' });
 		var note = E('div', { 'class': 'h5net-note' });
+		var hint = E('span', { 'class': 'h5net-hint' });
+		var reset = E('button', {
+			'class': 'h5net-reset',
+			'click': L.bind(this.resetSelection, this)
+		}, _('Reset to the active mode'));
 		var apply = E('button', {
 			'class': 'cbi-button cbi-button-apply',
 			'click': L.bind(this.applySelection, this)
 		});
+		var chooser = this.buildChooser();
 
 		var root = E('div', { 'class': 'h5net', 'id': 'h5net-status' }, [
 			E('div', { 'class': 'h5net-head' }, [
-				E('div', {}, [ E('h2', {}, _('Network exits')), E('p', {}, _('Click the connection cards to set the order. The first is preferred and the second is fallback.')) ]),
+				E('div', {}, [
+					E('h2', {}, _('Network exits')),
+					E('p', {}, _('The cards show the live state of each link. Pick an exit mode below and apply it to change the policy.'))
+				]),
 				badge
 			]),
 			note,
 			E('div', { 'class': 'h5net-grid' }, [ wan.card, modem.card ]),
-			E('div', { 'class': 'h5net-actions' }, [ apply ])
+			chooser.node,
+			E('div', { 'class': 'h5net-actions' }, [
+				E('div', { 'class': 'h5net-hint-wrap' }, [ hint, reset ]),
+				apply
+			])
 		]);
 
-		this.ui = { root: root, badge: badge, note: note, apply: apply, wan: wan, modem: modem };
+		this.ui = {
+			root: root, badge: badge, note: note, apply: apply, hint: hint, reset: reset,
+			options: chooser.options, wan: wan, modem: modem
+		};
 
 		return root;
 	},
 
 	updatePanel: function() {
 		var data = this.liveData;
-		var same, active, changed;
+		var same, active, changed, external, option, checked, i;
 
-		if (!this.ui || !data || !document.body.contains(this.ui.root)) return;
+		if (!this.ui || !data) return;
 
 		data.mode = data.mode || 'wan_first';
 		data.active4 = data.active4 || 'none';
@@ -222,12 +409,27 @@ return view.extend({
 		same = data.active4 === data.active6 && data.active4 !== 'none';
 		active = data.active4 !== 'none' ? data.active4 : data.active6;
 		changed = this.pendingMode !== this.baselineMode;
+		external = changed && this.selectionBase !== this.baselineMode;
 
 		this.ui.badge.className = 'h5net-active' + (active === 'none' ? ' fail' : (active === 'other' ? ' warn' : ''));
 		this.ui.badge.textContent = same ? _('Current exit: %s').format(this.exitLabel(active)) : _('IPv4: %s · IPv6: %s').format(this.exitLabel(data.active4), this.exitLabel(data.active6));
 		this.ui.note.textContent = this.statusMessage(data);
 		this.updateCard('wan', data);
 		this.updateCard('modem', data);
+
+		for (i = 0; i < this.ui.options.length; i++) {
+			option = this.ui.options[i];
+			checked = option.mode === this.pendingMode;
+			option.input.checked = checked;
+
+			if (checked) option.label.setAttribute('data-checked', '1');
+			else option.label.removeAttribute('data-checked');
+		}
+
+		this.ui.hint.textContent = external
+			? _('The active exit changed elsewhere. Your unapplied selection was kept.')
+			: (changed ? _('Selected, not applied yet') : '');
+		this.ui.reset.hidden = !external;
 		this.ui.apply.disabled = (!changed || this.applying);
 		this.ui.apply.textContent = this.applying ? _('Applying…') : _('Apply settings');
 	},
@@ -245,6 +447,7 @@ return view.extend({
 		this.liveData.mode = this.liveData.mode || 'wan_first';
 		this.baselineMode = this.liveData.mode;
 		this.pendingMode = this.baselineMode;
+		this.selectionBase = this.baselineMode;
 		this.applying = false;
 		this.injectStyle();
 		var root = this.buildPanel();
