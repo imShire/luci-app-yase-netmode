@@ -32,7 +32,7 @@ return view.extend({
 	},
 
 	styleNode: function() {
-		return E('style', {}, [
+		return E('style', { 'id': 'h5net-style' }, [
 			'.h5net{--net-blue:#4f8ff7;--net-green:#31b985;--net-amber:#e7a33e;--net-red:#e45f5f}',
 			'.h5net-head{display:flex;justify-content:space-between;align-items:center;gap:18px;padding:2px 2px 14px;margin-bottom:14px;border-bottom:1px solid var(--border-color-low,#e8e8e8)}',
 			'.h5net-head h2{margin:0 0 4px;font-size:22px;line-height:1.3}.h5net-head p{margin:0;color:var(--text-color-medium,#666);font-size:13px}',
@@ -51,6 +51,11 @@ return view.extend({
 			'.h5net-actions{display:flex;justify-content:flex-end;align-items:center;margin-top:14px;padding-top:14px;border-top:1px solid var(--border-color-low,#e8e8e8)}.h5net-actions .cbi-button{min-width:112px}',
 			'@media(max-width:620px){.h5net-head{display:block}.h5net-active{margin-top:11px}.h5net-grid{grid-template-columns:1fr}.h5net-actions .cbi-button{width:100%}}'
 		].join(''));
+	},
+
+	injectStyle: function() {
+		if (document.getElementById('h5net-style')) return;
+		document.head.appendChild(this.styleNode());
 	},
 
 	exitLabel: function(exit) {
@@ -101,50 +106,57 @@ return view.extend({
 
 		this.selecting = true;
 		this.pendingMode = this.orderMode(order);
-		this.repaint();
+		this.updatePanel();
 	},
 
 	cardKeydown: function(kind, ev) {
 		if (ev.key === 'Enter' || ev.key === ' ') this.selectRoute(kind, ev);
 	},
 
-	routeCard: function(kind, data) {
+	cardNode: function(kind) {
+		var modem = kind === 'modem';
+		var role = E('div', { 'class': 'h5net-role' });
+		var state = E('div', { 'class': 'h5net-state' });
+		var proto4 = E('span', { 'class': 'h5net-proto' });
+		var proto6 = E('span', { 'class': 'h5net-proto' });
+		var card = E('div', { 'class': 'h5net-card ' + (modem ? 'modem' : 'wan') }, [
+			E('div', { 'class': 'h5net-cardtop' }, [
+				E('div', { 'class': 'h5net-name' }, [
+					E('div', { 'class': 'h5net-icon' }, modem ? '5G' : 'WAN'),
+					E('div', {}, [
+						E('h3', {}, modem ? _('5G modem') : _('Wired WAN')),
+						role
+					])
+				]),
+				state
+			]),
+			E('div', { 'class': 'h5net-protos' }, [ proto4, proto6 ])
+		]);
+
+		return { card: card, role: role, state: state, proto4: proto4, proto6: proto6 };
+	},
+
+	updateCard: function(kind, data) {
+		var ui = this.ui[kind];
 		var modem = kind === 'modem';
 		var present = modem ? data.modem_present : data.wan_present;
 		var up4 = modem ? data.modem_up : data.wan_up;
 		var up6 = modem ? data.modem6_up : data.wan6_up;
 		var ready4 = modem ? (data.modem4_ready || up4) : (data.wan4_ready || up4);
 		var ready6 = modem ? (data.modem6_ready || up6) : (data.wan6_ready || up6);
-		var order = this.modeOrder(this.pendingMode);
-		var selected = order.indexOf(kind) > -1;
+		var selected = this.modeOrder(this.pendingMode).indexOf(kind) > -1;
 		var active4 = data.active4 === kind;
 		var active6 = data.active6 === kind;
 		var state = this.connectionState(present, (up4 === '1' || up6 === '1') ? '1' : '0');
-		var cls = 'h5net-card ' + (modem ? 'modem' : 'wan') + (selected ? ' selected' : ' unselected') + ((active4 || active6) ? ' active' : '');
 
-		return E('div', {
-			'class': cls,
-			'role': 'button',
-			'tabindex': '0',
-			'aria-pressed': selected ? 'true' : 'false',
-			'click': L.bind(this.selectRoute, this, kind),
-			'keydown': L.bind(this.cardKeydown, this, kind)
-		}, [
-			E('div', { 'class': 'h5net-cardtop' }, [
-				E('div', { 'class': 'h5net-name' }, [
-					E('div', { 'class': 'h5net-icon' }, modem ? '5G' : 'WAN'),
-					E('div', {}, [
-						E('h3', {}, modem ? _('5G modem') : _('Wired WAN')),
-						E('div', { 'class': 'h5net-role' }, this.roleLabel(this.pendingMode, kind))
-					])
-				]),
-				E('div', { 'class': 'h5net-state ' + state.cls }, state.label)
-			]),
-			E('div', { 'class': 'h5net-protos' }, [
-				E('span', { 'class': 'h5net-proto' + (active4 ? ' current' : '') }, active4 ? _('IPv4 in use') : (ready4 === '1' ? _('IPv4 ready') : _('IPv4 unavailable'))),
-				E('span', { 'class': 'h5net-proto' + (active6 ? ' current' : '') }, active6 ? _('IPv6 in use') : (ready6 === '1' ? _('IPv6 ready') : _('IPv6 unavailable')))
-			])
-		]);
+		ui.card.className = 'h5net-card ' + (modem ? 'modem' : 'wan') + (selected ? ' selected' : ' unselected') + ((active4 || active6) ? ' active' : '');
+		ui.role.textContent = this.roleLabel(this.pendingMode, kind);
+		ui.state.className = 'h5net-state ' + state.cls;
+		ui.state.textContent = state.label;
+		ui.proto4.className = 'h5net-proto' + (active4 ? ' current' : '');
+		ui.proto4.textContent = active4 ? _('IPv4 in use') : (ready4 === '1' ? _('IPv4 ready') : _('IPv4 unavailable'));
+		ui.proto6.className = 'h5net-proto' + (active6 ? ' current' : '');
+		ui.proto6.textContent = active6 ? _('IPv6 in use') : (ready6 === '1' ? _('IPv6 ready') : _('IPv6 unavailable'));
 	},
 
 	statusMessage: function(data) {
@@ -183,7 +195,7 @@ return view.extend({
 	applySelection: function() {
 		if (this.applying || this.pendingMode === this.baselineMode) return;
 		this.applying = true;
-		this.repaint();
+		this.updatePanel();
 
 		return fs.exec('/usr/sbin/yase-netmode', [ 'set', this.pendingMode ]).then(L.bind(function() {
 			ui.addNotification(null, E('p', _('Exit selection applied successfully.')));
@@ -196,51 +208,63 @@ return view.extend({
 			}, this));
 		}, this), L.bind(function(err) {
 			this.applying = false;
-			this.repaint();
+			this.updatePanel();
 			ui.addNotification(null, E('p', this.applyErrText(err)), 'danger');
 		}, this));
 	},
 
-	statusPanel: function(data) {
-		var same, active, badgeText, badgeClass, changed;
+	buildPanel: function() {
+		var wan = this.cardNode('wan');
+		var modem = this.cardNode('modem');
+		var badge = E('div', { 'class': 'h5net-active' });
+		var note = E('div', { 'class': 'h5net-note' });
+		var apply = E('button', {
+			'class': 'cbi-button cbi-button-apply',
+			'click': L.bind(this.applySelection, this)
+		});
+
+		var root = E('div', { 'class': 'h5net', 'id': 'h5net-status' }, [
+			E('div', { 'class': 'h5net-head' }, [
+				E('div', {}, [ E('h2', {}, _('Network exits')), E('p', {}, _('Click the connection cards to set the order. The first is preferred and the second is fallback.')) ]),
+				badge
+			]),
+			note,
+			E('div', { 'class': 'h5net-grid' }, [ wan.card, modem.card ]),
+			E('div', { 'class': 'h5net-actions' }, [ apply ])
+		]);
+
+		this.ui = { root: root, badge: badge, note: note, apply: apply, wan: wan, modem: modem };
+
+		return root;
+	},
+
+	updatePanel: function() {
+		var data = this.liveData;
+		var same, active, changed;
+
+		if (!this.ui || !data || !document.body.contains(this.ui.root)) return;
+
 		data.mode = data.mode || 'wan_first';
 		data.active4 = data.active4 || 'none';
 		data.active6 = data.active6 || 'none';
 		same = data.active4 === data.active6 && data.active4 !== 'none';
 		active = data.active4 !== 'none' ? data.active4 : data.active6;
-		badgeText = same ? _('Current exit: %s').format(this.exitLabel(active)) : _('IPv4: %s · IPv6: %s').format(this.exitLabel(data.active4), this.exitLabel(data.active6));
-		badgeClass = 'h5net-active' + (active === 'none' ? ' fail' : (active === 'other' ? ' warn' : ''));
 		changed = this.pendingMode !== this.baselineMode;
 
-		return E('div', { 'class': 'h5net', id: 'h5net-status' }, [
-			this.styleNode(),
-			E('div', { 'class': 'h5net-head' }, [
-				E('div', {}, [ E('h2', {}, _('Network exits')), E('p', {}, _('Click the connection cards to set the order. The first is preferred and the second is fallback.')) ]),
-				E('div', { 'class': badgeClass }, badgeText)
-			]),
-			E('div', { 'class': 'h5net-note' }, this.statusMessage(data)),
-			E('div', { 'class': 'h5net-grid' }, [ this.routeCard('wan', data), this.routeCard('modem', data) ]),
-			E('div', { 'class': 'h5net-actions' }, [
-				E('button', {
-					'class': 'cbi-button cbi-button-apply',
-					'disabled': (!changed || this.applying) ? 'disabled' : null,
-					'click': L.bind(this.applySelection, this)
-				}, this.applying ? _('Applying…') : _('Apply settings'))
-			])
-		]);
-	},
-
-	repaint: function() {
-		var old = document.getElementById('h5net-status');
-		if (old && this.liveData)
-			old.parentNode.replaceChild(this.statusPanel(this.liveData), old);
+		this.ui.badge.className = 'h5net-active' + (active === 'none' ? ' fail' : (active === 'other' ? ' warn' : ''));
+		this.ui.badge.textContent = same ? _('Current exit: %s').format(this.exitLabel(active)) : _('IPv4: %s · IPv6: %s').format(this.exitLabel(data.active4), this.exitLabel(data.active6));
+		this.ui.note.textContent = this.statusMessage(data);
+		this.updateCard('wan', data);
+		this.updateCard('modem', data);
+		this.ui.apply.disabled = (!changed || this.applying);
+		this.ui.apply.textContent = this.applying ? _('Applying…') : _('Apply settings');
 	},
 
 	refreshStatus: function() {
 		return this.statusCommand().then(L.bind(function(res) {
 			this.liveData = this.parseStatus(res);
 			this.baselineMode = this.liveData.mode || 'wan_first';
-			this.repaint();
+			this.updatePanel();
 		}, this));
 	},
 
@@ -250,7 +274,10 @@ return view.extend({
 		this.baselineMode = this.liveData.mode;
 		this.pendingMode = this.baselineMode;
 		this.applying = false;
+		this.injectStyle();
+		var root = this.buildPanel();
+		this.updatePanel();
 		poll.add(L.bind(this.refreshStatus, this), 5);
-		return this.statusPanel(this.liveData);
+		return root;
 	}
 });
