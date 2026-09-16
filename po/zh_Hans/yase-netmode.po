@@ -1,6 +1,6 @@
 msgid ""
 msgstr ""
-"Project-Id-Version: luci-app-yase-netmode 1.1.0\n"
+"Project-Id-Version: luci-app-yase-netmode 1.0.0\n"
 "PO-Revision-Date: 2026-09-09 12:00+0800\n"
 "Last-Translator: YASE\n"
 "Language-Team: Chinese (Simplified)\n"
@@ -93,68 +93,14 @@ msgstr "IPv4：%s · IPv6：%s"
 msgid "Unknown error"
 msgstr "未知错误"
 
+msgid "Not selected"
+msgstr "未选择"
+
 msgid "Network exits"
 msgstr "网络出口"
 
-msgid "The cards show the live state of each link. Pick an exit mode below and apply it to change the policy."
-msgstr "卡片展示各线路的实时状态；在下方选择出口模式并点击应用，才会更改策略。"
-
-msgid "Exit mode"
-msgstr "出口模式"
-
-msgid "Automatic failover"
-msgstr "断线自动切换"
-
-msgid "Force a single exit"
-msgstr "强制只用一条"
-
-msgid "Wired WAN preferred"
-msgstr "有线 WAN 优先"
-
-msgid "5G preferred"
-msgstr "5G 优先"
-
-msgid "Wired WAN only"
-msgstr "仅有线 WAN"
-
-msgid "5G only"
-msgstr "仅 5G"
-
-msgid "Uses wired WAN. Switches to 5G automatically when it goes down."
-msgstr "走有线 WAN，断线时自动切换到 5G。"
-
-msgid "Uses 5G. Switches to wired WAN automatically when it goes down."
-msgstr "走 5G，断线时自动切换到有线 WAN。"
-
-msgid "Uses wired WAN only. The 5G link stays disabled."
-msgstr "只走有线 WAN，5G 线路保持停用。"
-
-msgid "Uses 5G only. The wired WAN link stays disabled."
-msgstr "只走 5G，有线 WAN 线路保持停用。"
-
-msgid "The selected link is not available"
-msgstr "所选线路当前不可用"
-
-msgid "%s is not configured on this device. Choosing it as the only exit leaves no working route until it comes back."
-msgstr "%s 在本设备上尚未配置。选为唯一出口后，到它恢复为止将没有可用路由。"
-
-msgid "%s is currently down. Choosing it as the only exit leaves no working route until it comes back."
-msgstr "%s 当前处于断开状态。选为唯一出口后，到它恢复为止将没有可用路由。"
-
-msgid "Cancel"
-msgstr "取消"
-
-msgid "Continue"
-msgstr "继续"
-
-msgid "Selected, not applied yet"
-msgstr "已选择，尚未应用"
-
-msgid "Reset to the active mode"
-msgstr "恢复为当前生效模式"
-
-msgid "The active exit changed elsewhere. Your unapplied selection was kept."
-msgstr "生效出口已在其他地方被更改，你尚未应用的选择已保留。"
+msgid "Click the connection cards to set the order. The first is preferred and the second is fallback."
+msgstr "点击线路卡片设置使用顺序；第一条为首选出口，第二条为备用出口。"
 
 msgid "Apply settings"
 msgstr "应用设置"
@@ -167,12 +113,3 @@ msgstr "出口选择已成功应用。"
 
 msgid "Failed to apply exit selection:"
 msgstr "出口选择应用失败："
-
-msgid "Another exit policy update is running. Try again in a moment."
-msgstr "另一个出口策略更新正在执行，请稍后重试。"
-
-msgid "Failed to save the exit policy."
-msgstr "出口策略保存失败。"
-
-msgid "The mode was not saved and the network reload failed. Retry, or check the system log."
-msgstr "模式未保存，且网络重载失败。请重试，或检查系统日志。"
