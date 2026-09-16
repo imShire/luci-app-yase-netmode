@@ -1,6 +1,6 @@
 msgid ""
 msgstr ""
-"Project-Id-Version: luci-app-yase-netmode 1.0.0\n"
+"Project-Id-Version: luci-app-yase-netmode 1.1.1\n"
 "PO-Revision-Date: 2026-09-09 12:00+0800\n"
 "Last-Translator: YASE\n"
 "Language-Team: Chinese (Simplified)\n"
@@ -99,8 +99,23 @@ msgstr "未选择"
 msgid "Network exits"
 msgstr "网络出口"
 
-msgid "Click the connection cards to set the order. The first is preferred and the second is fallback."
-msgstr "点击线路卡片设置使用顺序；第一条为首选出口，第二条为备用出口。"
+msgid "Exit mode"
+msgstr "出口模式"
+
+msgid "Wired WAN first"
+msgstr "有线 WAN 优先"
+
+msgid "5G first"
+msgstr "5G 优先"
+
+msgid "Wired WAN only"
+msgstr "仅有线 WAN"
+
+msgid "5G only"
+msgstr "仅 5G"
+
+msgid "Pick an exit mode below and apply it. The cards only show live status."
+msgstr "在下方选择出口模式后点击应用；卡片仅展示实时状态。"
 
 msgid "Apply settings"
 msgstr "应用设置"
