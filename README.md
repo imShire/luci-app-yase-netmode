@@ -32,21 +32,21 @@
 
 ```sh
 # 上传 GitHub 后，打 tag（tag 必须和 Makefile 的 PKG_VERSION 一致）
-git tag v1.0.0
-git push origin v1.0.0
+git tag v1.1.1
+git push origin v1.1.1
 ```
 
 Actions 完成后会生成两个包：
 
 ```text
-luci-app-yase-netmode-1.0.0-r1.apk
+luci-app-yase-netmode-1.1.1-r1.apk
 luci-i18n-yase-netmode-zh-cn-*.apk
 ```
 
 在路由器上安装（包由你自己的 GitHub Actions 构建）：
 
 ```sh
-apk add --allow-untrusted /tmp/luci-app-yase-netmode-1.0.0-r1.apk
+apk add --allow-untrusted /tmp/luci-app-yase-netmode-1.1.1-r1.apk
 apk add --allow-untrusted /tmp/luci-i18n-yase-netmode-*.apk
 ```
 
